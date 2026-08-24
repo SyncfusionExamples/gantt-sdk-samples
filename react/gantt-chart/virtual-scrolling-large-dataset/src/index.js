@@ -1,5 +1,4 @@
 import { createRoot } from 'react-dom/client';
-import * as React from 'react';
 import { useEffect, useRef, useState } from 'react';
 import {
     GanttComponent,
@@ -11,6 +10,13 @@ import {
     Edit
 } from '@syncfusion/ej2-react-gantt';
 
+/**
+ * Demo: Syncfusion React Gantt with row + timeline virtualization.
+ * Renders 50K / 75K / 100K hierarchical tasks and reports render time
+ * via the `dataBound` callback.
+ *
+ * @returns {JSX.Element} The status bar + Gantt component.
+ */
 const Virtualscroll = () => {
 
     const [data, setData] = useState([]);
@@ -33,6 +39,16 @@ const Virtualscroll = () => {
         dependency: 'Predecessor'
     };
 
+    /**
+     * Builds a hierarchical task list on the fly.
+     * Each parent project gets 20 children arranged in 4 sets of 5;
+     * Set-1 task #1 is the FS-predecessor of Set-4 task #1.
+     *
+     * @param {number} recordCount Approximate number of records to generate.
+     *   The real count is snapped down to a whole number of parent blocks
+     *   (1 parent + 20 children = 21 records).
+     * @returns {Array<object>} Flat array of task records.
+     */
     const generateVirtualData = (recordCount) => {
 
         const virtualData = [];
@@ -106,39 +122,37 @@ const Virtualscroll = () => {
         return virtualData;
     };
 
+    /**
+     * Generates a virtual dataset of `count` records, pushes it to
+     * state, and remounts the Gantt so VirtualScroll rebuilds cleanly.
+     * Heavy work is deferred one tick so React can paint the loading
+     * state first.
+     *
+     * @param {number} count Number of records to generate (50_000 / 75_000 / 100_000).
+     * @returns {void}
+     */
     const loadData = (count) => {
-        if (!count) {
+        if (!count || loading) {
             return;
-        }
-        if (loading) {
-            return; // ignore re-entrant picks while loading
         }
 
         setLoading(true);
-        // Store the value the same way the <option value="..."> attribute
-        // is written, so the controlled <select> stays on the chosen item
-        // after the dataset is loaded.
         setSelectedDataset(String(count));
         setStatusText('⏳ Loading...');
-
-        // Start clock right BEFORE the heavy work and remount.
         startTime.current = performance.now();
 
-        // Defer the heavy work to the next tick so React can paint
-        // the disabled-dropdown / loading state first.
         window.setTimeout(() => {
             const generated = generateVirtualData(count);
             setData(generated);
-            // Force a remount so VirtualScroll rebuilds cleanly. This also
-            // eliminates the "shimmer sticks" issue when dataSource changes
-            // from [] -> large dataset with virtualization enabled.
             setRenderKey((k) => k + 1);
         }, 0);
     };
 
-    // Safety net: if for any reason `dataBound` does not fire (it can
-    // skip when re-rendering with an empty -> populated dataSource),
-    // force-clear the loading state after 5 seconds.
+    /**
+     * Safety net for `dataBound`: if it never fires (it can be skipped
+     * when the dataSource transitions empty -> populated under
+     * virtualization), force-clear the loading state after 5 seconds.
+     */
     useEffect(() => {
         if (!loading) {
             return;
@@ -152,6 +166,12 @@ const Virtualscroll = () => {
         return () => window.clearTimeout(t);
     }, [loading, data]);
 
+    /**
+     * `dataBound` handler — computes elapsed time since `loadData`
+     * started and writes it to the status bar.
+     *
+     * @returns {void}
+     */
     const onDataBound = () => {
 
         if (!startTime.current) {

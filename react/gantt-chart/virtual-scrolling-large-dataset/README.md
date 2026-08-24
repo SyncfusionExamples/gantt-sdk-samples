@@ -10,6 +10,11 @@ A high-performance Gantt chart sample that demonstrates Syncfusion's React Gantt
 - **Inline editing, row selection, tree expand/collapse** working alongside virtualization
 - **Performance benchmarking** via the `dataBound` event with a 5-second safety fallback
 
+## � Prerequisites
+
+- Node.js **18+**
+- npm **9+** (ships with Node 18)
+
 ## 🚀 Run Locally
 
 ```bash
@@ -19,13 +24,21 @@ npm start
 
 Open `http://localhost:3000` in your browser, then use the **Dataset** dropdown in the status bar to load 50K / 75K / 100K records.
 
+## 🏗️ Build for Production
+
+```bash
+npm run build
+```
+
+Output is written to `build/` and is a static bundle ready to deploy to any static host (Vercel, Netlify, GitHub Pages, S3, IIS, etc.).
+
+> Static CSS for the status bar is inlined inside [public/index.html](public/index.html) — do **not** re-add a `src/index.css` file; it will be ignored.
+
 ## 📂 Project Structure
 
 ```
-public/index.html   - Page shell + Syncfusion Tailwind theme
+public/index.html   - Page shell + inline status-bar styling
 src/index.js        - Gantt component + virtual data generator
-src/data.js         - Sample datasets (projectNewData, zoomingData, etc.)
-src/index.css       - Status-bar styling
 ```
 
 ## ⚙️ How It Works
