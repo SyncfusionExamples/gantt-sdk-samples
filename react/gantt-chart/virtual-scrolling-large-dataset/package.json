@@ -1,0 +1,35 @@
+{
+  "name": "react-gantt-virtualization",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Syncfusion React Gantt demo with row + timeline virtualization (50K-100K records)",
+  "dependencies": {
+    "react": "18.1.0",
+    "react-dom": "18.1.0",
+    "@syncfusion/ej2-base": "34.2.4",
+    "@syncfusion/ej2-react-base": "34.2.2",
+    "@syncfusion/ej2-react-gantt": "34.2.4",
+    "@syncfusion/ej2-gantt": "34.2.4"
+  },
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test --env=jsdom",
+    "eject": "react-scripts eject"
+  },
+  "devDependencies": {
+    "react-scripts": "latest"
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  }
+}
