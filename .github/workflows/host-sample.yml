@@ -1,0 +1,73 @@
+name: Host sample on GitHub Pages
+
+# Builds the React Gantt virtual-scrolling sample and publishes it to
+# the `gh-pages` branch. The live URL is:
+#   https://syncfusionexamples.github.io/gantt-sdk-samples/react-gantt/virtual-scrolling-large-dataset/
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+# Required so the deploy job can push to gh-pages and create the Pages
+# deployment status check on first run.
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+# Avoid concurrent deploys racing each other.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: react-gantt/virtual-scrolling-large-dataset
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: react-gantt/virtual-scrolling-large-dataset/package-lock.json
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund --legacy-peer-deps
+
+      - name: Build production bundle
+        env:
+          # CI=true prevents CRA from opening an interactive browser/error
+          # overlay on warnings.
+          CI: 'true'
+        run: npm run build
+
+      - name: Copy GH-Pages SPA fallback (404.html -> 404.html)
+        # react-scripts copies public/ verbatim into build/, so 404.html and
+        # .nojekyll land alongside index.html automatically. This step is a
+        # safety net in case future CRA versions ignore dotfiles.
+        run: |
+          if [ -f build/404.html ]; then echo "404.html present ✓"; fi
+          if [ ! -f build/.nojekyll ]; then touch build/.nojekyll; fi
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: react-gantt/virtual-scrolling-large-dataset/build
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
