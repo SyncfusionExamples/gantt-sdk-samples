@@ -7,7 +7,6 @@ import {
     ColumnDirective,
     ColumnsDirective,
     VirtualScroll,
-    Edit
 } from '@syncfusion/ej2-react-gantt';
 import { generateVirtualData } from './data';
 
@@ -173,7 +172,7 @@ const Virtualscroll = () => {
                     <ColumnDirective field='Progress' />
                 </ColumnsDirective>
 
-                <Inject services={[Selection, VirtualScroll, Edit]} />
+                <Inject services={[Selection, VirtualScroll]} />
             </GanttComponent>
         </div>
     );

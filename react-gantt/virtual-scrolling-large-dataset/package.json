@@ -2,7 +2,6 @@
   "name": "react-gantt-virtualization",
   "version": "1.0.0",
   "private": true,
-  "homepage": "https://syncfusionexamples.github.io/gantt-sdk-samples/react-gantt/virtual-scrolling-large-dataset",
   "description": "Syncfusion React Gantt demo with row + timeline virtualization (50K-100K records)",
   "dependencies": {
     "react": "18.1.0",
