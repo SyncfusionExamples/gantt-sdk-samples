@@ -1,9 +1,5 @@
 # Syncfusion<sup>®</sup> Gantt SDK Samples
 
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-![GitHub stars](https://img.shields.io/github/stars/SyncfusionExamples/gantt-sdk-samples?style=social)
-![Issues](https://img.shields.io/github/issues/SyncfusionExamples/gantt-sdk-samples)
-
 A curated collection of **Syncfusion<sup>®</sup> Gantt SDK** component samples. The
 Syncfusion Gantt SDK combines the [Gantt Chart](#-featured-components) and
 [Kanban](#-featured-components) components to help teams plan, track, and manage
@@ -12,11 +8,11 @@ board-based task management. Each sample in this repository is a small,
 self-contained project that demonstrates a specific feature or integration
 pattern and serves as a perfect starting point for your own application.
 
-> 📘 Official overview: <https://help.syncfusion.com/gantt-sdk/overview>
+> Official overview: <https://help.syncfusion.com/gantt-sdk/overview>
 
 ---
 
-## ✨ Featured Components
+## Featured Components
 
 ### 1. Gantt Chart
 
