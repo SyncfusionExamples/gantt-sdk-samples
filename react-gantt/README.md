@@ -1,8 +1,5 @@
 # Syncfusion<sup>®</sup> React Gantt Samples
 
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](../LICENSE)
-![GitHub stars](https://img.shields.io/github/stars/SyncfusionExamples/gantt-sdk-samples?style=social)
-
 React-based samples for the **Syncfusion<sup>®</sup> Gantt SDK**. Each sample in
 this directory is a small, self-contained React project that demonstrates a
 specific Gantt Chart feature and serves as a starting point for your own
