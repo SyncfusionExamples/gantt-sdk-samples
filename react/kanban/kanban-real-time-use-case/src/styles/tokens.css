@@ -1,0 +1,115 @@
+/* ===========================================================
+   Presale Kanban Showcase — Design Tokens
+   Single source of truth for colors, spacing, typography,
+   radius, shadow, motion. All values are CSS variables.
+   =========================================================== */
+
+:root {
+  /* --- Brand & semantic colors (OKLCH for perceptual evenness) --- */
+  --color-primary:        oklch(58% 0.18 250);          /* Indigo-blue brand */
+  --color-primary-hover:  oklch(52% 0.18 250);
+  --color-primary-soft:   oklch(95% 0.04 250);          /* Tinted surface */
+  --color-primary-fg:     oklch(99% 0 0);               /* Text on primary */
+
+  --color-success:        oklch(64% 0.16 150);
+  --color-success-soft:   oklch(95% 0.05 150);
+  --color-warning:        oklch(78% 0.15 80);
+  --color-warning-soft:   oklch(96% 0.06 80);
+  --color-danger:         oklch(60% 0.20 25);
+  --color-danger-soft:    oklch(95% 0.05 25);
+  --color-info:           oklch(70% 0.12 230);
+  --color-info-soft:      oklch(95% 0.04 230);
+
+  /* --- Tinted neutrals (toward brand hue 250 for cohesion) --- */
+  --color-bg:             oklch(99% 0.005 250);
+  --color-bg-alt:         oklch(97% 0.008 250);
+  --color-surface:        oklch(100% 0 0);
+  --color-surface-alt:    oklch(98% 0.006 250);
+  --color-border:         oklch(91% 0.01 250);
+  --color-border-strong:  oklch(82% 0.015 250);
+
+  --color-text:           oklch(22% 0.02 250);
+  --color-text-muted:     oklch(48% 0.02 250);
+  --color-text-subtle:    oklch(60% 0.015 250);
+  --color-text-inverse:   oklch(99% 0 0);
+
+  /* --- Spacing scale (4pt base) --- */
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-5:  20px;
+  --space-6:  24px;
+  --space-8:  32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* --- Radius --- */
+  --radius-sm: 4px;
+  --radius:    8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-pill: 999px;
+
+  /* --- Shadows (subtle, with brand tint) --- */
+  --shadow-sm: 0 1px 2px 0 oklch(50% 0.05 250 / 0.06);
+  --shadow:    0 2px 6px -1px oklch(50% 0.05 250 / 0.08), 0 1px 2px 0 oklch(50% 0.05 250 / 0.04);
+  --shadow-lg: 0 10px 24px -8px oklch(50% 0.05 250 / 0.18), 0 2px 6px 0 oklch(50% 0.05 250 / 0.08);
+
+  /* --- Typography --- */
+  --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: 'SFMono-Regular', Menlo, Consolas, monospace;
+  --fs-xs:   12px;
+  --fs-sm:   13px;
+  --fs-base: 14px;
+  --fs-md:   16px;
+  --fs-lg:   18px;
+  --fs-xl:   20px;
+  --fs-2xl:  24px;
+  --fs-3xl:  32px;
+  --lh-tight:   1.25;
+  --lh-normal:  1.5;
+  --lh-relaxed: 1.65;
+
+  /* --- Motion --- */
+  --dur-fast: 150ms;
+  --dur:      220ms;
+  --dur-slow: 320ms;
+  --ease:     cubic-bezier(0.2, 0.7, 0.2, 1);
+
+  /* --- Layout --- */
+  --header-h:      64px;
+  --tabs-h:        56px;
+  --kanban-min-w:  280px;
+  --maxw-app:      1440px;
+
+  /* --- Syncfusion showcase design-system aliases ---
+     Used by the Healthcare Waitlist StatusBadge so the urgency/status
+     colors match the showcase.  Background = soft tint, foreground = solid
+     text color, both with WCAG AA contrast. */
+  --color-sf-bg-brand-primary:     oklch(94% 0.05 250);
+  --color-sf-fg-brand-primary:     oklch(35% 0.18 250);
+  --color-sf-bg-success-primary:   oklch(94% 0.06 150);
+  --color-sf-fg-success-primary:   oklch(40% 0.16 150);
+  --color-sf-bg-warning-primary:   oklch(96% 0.07 80);
+  --color-sf-fg-warning-primary:   oklch(45% 0.16 80);
+  --color-sf-bg-info-primary:      oklch(94% 0.05 230);
+  --color-sf-fg-info-primary:      oklch(40% 0.14 230);
+  --color-sf-bg-error-primary:     oklch(94% 0.05 25);
+  --color-sf-fg-error-primary:     oklch(45% 0.18 25);
+  --color-sf-bg-tertiary:          oklch(95% 0.005 250);
+  --color-sf-fg-secondary:         oklch(35% 0.02 250);
+  --color-sf-fg-tertiary:          oklch(50% 0.02 250);
+  --color-sf-fg-quinary:           oklch(60% 0.015 250);
+  --color-sf-border-secondary:     oklch(90% 0.01 250);
+  --color-sf-border-tertiary:      oklch(93% 0.008 250);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-fast: 0ms;
+    --dur: 0ms;
+    --dur-slow: 0ms;
+  }
+}

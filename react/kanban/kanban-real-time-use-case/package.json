@@ -1,0 +1,31 @@
+{
+  "name": "kanban-showcase",
+  "version": "1.0.0",
+  "description": "Syncfusion React Kanban: Sales CRM Pipeline + Healthcare Waitlist",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@syncfusion/ej2-base": "*",
+    "@syncfusion/ej2-react-buttons": "*",
+    "@syncfusion/ej2-react-calendars": "*",
+    "@syncfusion/ej2-react-dropdowns": "*",
+    "@syncfusion/ej2-react-inputs": "*",
+    "@syncfusion/ej2-react-kanban": "*",
+    "@syncfusion/ej2-react-navigations": "*",
+    "@syncfusion/ej2-react-notifications": "*",
+    "@syncfusion/ej2-react-popups": "*",
+    "@syncfusion/ej2-tailwind3-theme": "*",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.26.2"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.2",
+    "vite": "^5.4.8"
+  }
+}

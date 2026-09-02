@@ -1,0 +1,29 @@
+{
+  "component_type": "Multi-Page Kanban Workflow Application",
+  "variant": "Sales CRM Pipeline + Healthcare Waitlist",
+  "pages": [
+    {
+      "id": "sales-pipeline",
+      "name": "Sales CRM Pipeline",
+      "stages": ["New Lead", "Qualified", "Proposal", "Negotiation", "Won", "Lost"]
+    },
+    {
+      "id": "healthcare-waitlist",
+      "name": "Healthcare Waitlist",
+      "stages": ["Waiting", "Scheduled", "In Progress", "Completed"]
+    }
+  ],
+  "shared_sections": ["header", "page-navigation", "dashboard-stats", "filter-bar", "kanban-board", "card-actions", "crud-dialog"],
+  "elements": [
+    { "id": "app_header", "name": "App Header", "type_hint": "appbar header navigation" },
+    { "id": "page_tabs", "name": "Page Tabs", "type_hint": "tab strip navigation router" },
+    { "id": "dashboard_cards", "name": "Dashboard KPI Cards", "type_hint": "card grid statistics dashboard metrics" },
+    { "id": "kanban_board", "name": "Kanban Board", "type_hint": "kanban board columns cards swimlanes" },
+    { "id": "kanban_card", "name": "Kanban Card", "type_hint": "kanban card template custom" },
+    { "id": "filter_dropdown", "name": "Assignee Filter", "type_hint": "dropdown filter selection" },
+    { "id": "search_input", "name": "Search Input", "type_hint": "textbox search input" },
+    { "id": "date_range", "name": "Date Range", "type_hint": "daterangepicker date input calendar" },
+    { "id": "add_task_btn", "name": "Add Task Button", "type_hint": "button primary add action" },
+    { "id": "crud_dialog", "name": "Card CRUD Dialog", "type_hint": "dialog modal form edit view" }
+  ]
+}
