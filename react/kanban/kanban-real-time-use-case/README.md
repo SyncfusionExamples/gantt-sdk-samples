@@ -1,6 +1,6 @@
-# Presale Kanban Showcase
+# Kanban Showcase
 
-A real-world **Syncfusion React Kanban** presales sample combining two
+A real-world **Syncfusion React Kanban** sample combining two
 business workflows in a single React JavaScript application:
 
 1. **Sales CRM Pipeline** — 6-stage deal flow (New Lead → Lost) with

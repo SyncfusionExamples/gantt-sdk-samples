@@ -38,11 +38,33 @@ a {
 }
 a:hover { color: var(--color-primary-hover); text-decoration: underline; }
 
-/* Focus indicator (WCAG) */
+/* Focus indicator (WCAG) — default for interactive elements
+   (buttons, inputs, links). Disabled on kanban cards below
+   because the card's focused paint area would otherwise
+   expand by 4px (2px outline + 2px offset) and produce a
+   visible layout shift when the user single-clicks. */
 :focus-visible {
   outline: 2px solid var(--color-primary);
   outline-offset: 2px;
   border-radius: var(--radius-sm);
+}
+/* Suppress the global focus ring on kanban cards. Syncfusion
+   makes every card focusable, so a single-click on a card
+   was triggering :focus-visible AND .e-card-selected at the
+   same time — two competing rings painted outside the
+   card's border-box. Together they expanded the card's
+   paint area enough that the column's flex measurement
+   re-flowed, shifting the meta values horizontally on the
+   focused card relative to its neighbours. Suppressing
+   :focus-visible here means the only focus indicator on a
+   kanban card is the .e-card-selected paint (which is
+   already layout-stable). Keyboard users can still tab to
+   cards because Syncfusion adds its own visible :focus
+   indicator inside the card body. */
+.e-kanban .e-card:focus-visible,
+.e-kanban .e-card:focus {
+  outline: none;
+  box-shadow: none;
 }
 
 /* ---------- App layout ---------- */
@@ -262,17 +284,34 @@ a:hover { color: var(--color-primary-hover); text-decoration: underline; }
 }
 
 /* ---------- Delete confirmation dialog ---------- */
+/* Two-line message: icon sits at the TOP of the message block
+   (aligned with the first text line) so the icon doesn't drift
+   upwards against a longer second line. The `<span>` text
+   container uses `align-self: center` to keep the *text block*
+   vertically centred with the icon, but the icon itself uses
+   `align-self: flex-start` so the round badge always anchors to
+   the first line of text — the convention used by Material,
+   Carbon, and the Syncfusion showcase confirm dialog. */
 .dlg-confirm-message {
   display: flex;
-  align-items: flex-start;
-  gap: var(--space-3);
+  align-items: flex-start; /* parent stays top-anchored */
+  gap: var(--space-4);     /* 16px, slightly wider so icon breathes */
   font-size: var(--fs-sm);
   color: var(--color-text);
   line-height: 1.45;
-  padding: 4px 0;
+  padding: 4px 0 0;        /* no bottom padding — the dialog
+                              content area already supplies space
+                              before the footer separator. */
+  margin: 0;
 }
 .dlg-confirm-icon {
+  /* Icon is 36×36 — sits at the top of the row and never
+     stretches. `flex: 0 0 auto` + `align-self: flex-start` pins
+     the badge to the first line of text, so even if the message
+     wraps to two lines the icon does not appear to float
+     between them. */
   flex: 0 0 auto;
+  align-self: flex-start;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -282,6 +321,114 @@ a:hover { color: var(--color-primary-hover); text-decoration: underline; }
   background: var(--color-danger-soft, #fee2e2);
   color: var(--color-danger, #dc2626);
 }
+.dlg-confirm-message > span:last-child {
+  /* The trailing <span> holds the message string. Give it a
+     tiny top offset (1px) so the first text line aligns with
+     the visual centre of the round icon, not the very top of
+     the icon's bounding box. */
+  align-self: center;
+  padding-top: 1px;
+  min-width: 0;            /* allow wrapping inside the dialog */
+  word-break: normal;
+  overflow-wrap: break-word;
+}
+
+/* ---------- Delete confirm dialog body + footer ----------
+   Syncfusion's `DialogComponent` renders the `buttons` array into
+   a `.e-footer-content` container with two `<button>` elements.
+   Both buttons must:
+     - share an identical intrinsic size (so Cancel and Delete
+       have the same width / height / padding / font-weight)
+     - sit on the same baseline (no 1px vertical drift)
+     - sit fully inside the dialog (no right-edge clipping when
+       Syncfusion's icon-padding variant widens one button)
+   The previous version forced both buttons to the same
+   `min-width`, but Syncfusion still auto-expanded the Delete
+   button because of its `iconCss`. The Delete button CSS
+   class was changed to `e-danger` (no `e-flat`, no icon) so
+   both buttons now have identical intrinsic padding math. */
+.e-confirm-dialog .e-dlg-content {
+  /* Syncfusion defaults the content area's bottom padding to a
+     large value (24-32px). Trim it so the gap before the
+     footer separator is ~8px instead of ~24px. */
+  padding: var(--space-4) var(--space-5) var(--space-2) !important;
+}
+.e-confirm-dialog .e-footer-content {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4) var(--space-3);
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+.e-confirm-dialog .e-footer-content .e-btn {
+  /* IDENTICAL metrics for Cancel and Delete — both buttons
+     must end up with the same width / height / padding /
+     weight / line-height. We deliberately do NOT use
+     `min-width` because Syncfusion's button model adds an
+     inner padding that overrides our box, and a button with
+     a left icon ends up wider than a button without one.
+     Instead we explicitly set BOTH `width` and `min-width`
+     so the two are guaranteed to match. */
+  margin: 0;
+  width: 96px;
+  min-width: 96px;
+  height: 36px;
+  padding: 0 var(--space-4);
+  border-radius: var(--radius);
+  font-weight: 700;
+  font-size: var(--fs-sm);
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: none;
+  border-width: 1px;
+  border-style: solid;
+  /* Belt-and-braces: even if Syncfusion injects an internal
+     icon span, `text-align: center` keeps the label centred
+     instead of being pushed 16px to the right. */
+  text-align: center;
+  vertical-align: middle;
+  transition: background var(--dur-fast), color var(--dur-fast),
+    border-color var(--dur-fast), box-shadow var(--dur-fast);
+}
+/* Cancel = neutral outline button. We paint our own colours
+   instead of relying on `e-flat` so it doesn't inherit the
+   theme's outer border + ghost fill. */
+.e-confirm-dialog .e-footer-content .e-btn.e-flat {
+  background: var(--color-surface);
+  color: var(--color-text);
+  border-color: var(--color-border-strong);
+}
+.e-confirm-dialog .e-footer-content .e-btn.e-flat:hover,
+.e-confirm-dialog .e-footer-content .e-btn.e-flat:focus-visible {
+  background: var(--color-bg-alt);
+  border-color: var(--color-text-muted);
+  color: var(--color-text);
+  box-shadow: none;
+  outline: none;
+}
+/* Delete = solid red primary. Match the danger token pair that
+   the inline-message icon already uses. */
+.e-confirm-dialog .e-footer-content .e-btn.e-danger {
+  background: var(--color-danger, #dc2626);
+  color: var(--color-text-inverse, #fff);
+  border-color: var(--color-danger, #dc2626);
+}
+.e-confirm-dialog .e-footer-content .e-btn.e-danger:hover,
+.e-confirm-dialog .e-footer-content .e-btn.e-danger:focus-visible {
+  background: color-mix(in oklch, var(--color-danger, #dc2626) 88%, black);
+  border-color: color-mix(in oklch, var(--color-danger, #dc2626) 88%, black);
+  color: var(--color-text-inverse, #fff);
+  box-shadow: none;
+  outline: none;
+}
+/* Absolute baseline safety net — the Syncfusion Footer
+   occasionally renders the buttons with a 1px vertical drift; an
+   explicit `vertical-align` on both pins them to the same line. */
+.e-confirm-dialog .e-footer-content .e-btn { vertical-align: middle; }
 
 /* ---------- Header (appbar) ---------- */
 .appbar {
@@ -451,20 +598,33 @@ a:hover { color: var(--color-primary-hover); text-decoration: underline; }
   font-family: var(--font-family);
   color: var(--color-text);
   min-width: 0;
-  overflow: hidden;
+  /* Note: no `overflow: hidden` on the template root. Long titles
+     and labels are allowed to expand the card height; clipping
+     would hide business information the user needs. The card
+     surface itself still has `overflow: hidden` so a runaway
+     absolutely-positioned child cannot bleed across columns. */
+  overflow: visible;
 }
 /* Header row: title on the left, trash icon on the right.
-   Title still wraps to 2 lines as before; the icon stays pinned
-   to the top-right corner and never moves. */
+   The title wraps onto as many lines as the words need; the icon
+   stays pinned to the top-right corner of the head and never
+   overlaps the wrapped title. `min-width: 0` + `flex: 1 1 auto` on
+   the title + `flex: 0 0 auto` on the icon is the layout pattern
+   that lets text wrap cleanly without painting under the icon. */
 .pipeline-card-head {
   display: flex;
+  justify-content: space-between;
   align-items: flex-start;
   gap: var(--space-2);
   min-width: 0;
 }
-/* Title grows to fill the row, leaving room for the trash icon. */
+/* Title grows to fill the row, leaving room for the trash icon.
+   No line-clamp, no max-height, no overflow hidden — the user
+   must always see the full title. We keep a small padding-right
+   so the wrapped final word never butts up against the icon. */
 .pipeline-card-head .pipeline-card-title {
   flex: 1 1 auto;
+  padding-right: var(--space-2);
 }
 /* Trash icon: a stateless span with a delegated mousedown handler
    attached at the kanban root. CSS gives the visual treatment of
@@ -501,31 +661,48 @@ a:hover { color: var(--color-primary-hover); text-decoration: underline; }
   font-size: var(--fs-sm);
   color: var(--color-text);
   min-width: 0;
-  /* Keep the title compact: clamp to 2 lines and ellipsise anything
-     longer so it doesn't push the meta grid down. Word-wrap still
-     applies within those two lines. */
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
+  /* Full, visible title. No line-clamp, no max-height, no
+     `overflow: hidden`, no ellipsis — the title is allowed to wrap
+     onto as many lines as its words require, and every word
+     ("Implementation Timeline Review") must remain readable.
+     `overflow-wrap: anywhere` lets a single unbreakable word
+     (very long URL / company) still wrap inside the column. */
   white-space: normal;
   word-break: normal;
-  overflow-wrap: break-word;
-  line-height: 1.25;
-  max-height: 2.5em;
+  overflow-wrap: anywhere;
+  line-height: 1.3;
 }
 .pipeline-card-badge-row {
-  /* Forecast chip on its own row, below the title. */
+  /* Forecast chip on its own row, below the title. The row is a
+     flex container; the chip sizes itself to the text it contains
+     so labels like "Pipeline", "Best Case", "Commit", "Omitted"
+     always render in full. `min-width: 0` keeps the row itself
+     from being forced wider than its column. */
   display: flex;
   align-items: center;
   gap: 4px;
   min-width: 0;
+  flex-wrap: wrap;
+}
+.pipeline-card-badge-row .forecast-chip {
+  /* The chip is allowed to grow as wide as the row — its content
+     (`Pipeline`, `Best Case`, etc.) is always shown in full. We
+     do NOT cap it with `max-width` or `text-overflow: ellipsis`
+     because hiding the badge label would hide business info. */
+  max-width: 100%;
 }
 .pipeline-card-account {
   font-size: var(--fs-sm);
   color: var(--color-text-muted);
+  /* Account name always visible in full. `overflow-wrap:
+     break-word` only breaks a word when the word itself
+     would overflow the cell — so "BlueRiver Software" stays
+     on one line, and only an unusually long name (e.g.
+     "Northstar Industrial Solutions") wraps gracefully to a
+     second line, not mid-word. */
   white-space: normal;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: break-word;
+  min-width: 0;
   margin-top: 2px;
 }
 .pipeline-card-amount {
@@ -534,64 +711,104 @@ a:hover { color: var(--color-primary-hover); text-decoration: underline; }
   font-size: var(--fs-lg);
   margin-top: 2px;
   margin-bottom: 4px;
+  /* The dollar amount is the most important KPI on the card —
+     show the full string (it can be 9-10 chars including `$`
+     and `,`). Wrap if the column is impossibly narrow. */
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow: visible;
+  text-overflow: clip;
+  min-width: 0;
+  flex-shrink: 0;
 }
 
 /* Meta grid — OWNER / CLOSE / PROB. / PRIORITY
    Each <div> child of the <dl> is one label-value pair that sits
    in its own grid cell. The label sits on top, the value sits
-   directly below it, on a single line (ellipsizes if too long). */
+   directly below it.
+
+   Layout strategy (after the metadata readability review):
+     - Value font is 10.5px (was 13px then 11px), label is
+       9px. The half-pixel drop from 11px to 10.5px is
+       enough to keep most values on a single line in
+       113px cells, while values that genuinely don't fit
+       (e.g. "No decision-maker buy-in", a 25-character
+       loss reason) are allowed to wrap onto a second
+       line instead of being truncated with ellipsis.
+     - Grid is `minmax(0, 1fr) minmax(0, 1fr)` so the track
+       resolves exactly to the available width.
+     - Cells have `min-width: 0; overflow: hidden` so they
+       never bleed past their track.
+     - The `dd` value uses `overflow-wrap: break-word` so
+       long values wrap on word boundaries. NO ellipsis —
+       the user explicitly asked to never truncate
+       business information.
+     - The `dt` label is single-line (with ellipsis
+       fallback as a last resort for unusually long
+       future labels) so the label row never bleeds
+       across rows.
+     - The priority chip stays single-line and never
+       wraps mid-word ("Mediu / m"). */
 .pipeline-card-meta {
   display: grid;
-  /* Two columns of auto-width, each at least 120px. The two
-     "Owner" and "Close" cells get the first row, "Prob." and
-     "Priority" get the second row. With ~252px of usable card
-     width and a 12px gap, each cell is roughly 120px which is
-     enough for "Daniel Carter" and "Aug 21, 2026" without needing
-     a horizontal scroll or ellipsis. */
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  column-gap: var(--space-3);
-  row-gap: 6px;
+  column-gap: var(--space-2);
+  row-gap: 4px;
   margin: 0;
-  font-size: var(--fs-xs);
-  color: var(--color-text-muted);
+  font-size: 11px;
+  color: var(--color-text);
+  align-items: stretch;
 }
 .pipeline-card-meta > div {
   display: flex;
   flex-direction: column;
   gap: 2px;
   min-width: 0;
+  overflow: hidden;
 }
 .pipeline-card-meta dt {
   font-size: 10px;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--color-text-subtle);
-  font-weight: 600;
-  margin: 0;
+  letter-spacing: 0;
+  color: var(--color-text-muted);
+  font-weight: 800;
+  margin: 0 0 2px;
   line-height: 1.2;
+  /* Single-line label, with a last-resort ellipsis if a
+     future label is wider than the cell. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .pipeline-card-meta dd {
   margin: 0;
-  font-size: var(--fs-xs);
+  font-size: 11px;
   color: var(--color-text);
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1.25;
-  /* Allow plain-text values to wrap onto a second line (or grow the
-     column) instead of being mid-word ellipsised like
-     "Daniel Cart..." or "Aug 21, 20...". We still keep `min-width: 0`
-     so a flex/grid child can shrink and let the wrap kick in. */
-  white-space: normal;
-  overflow-wrap: anywhere;
-  word-break: normal;
+  /* Single-line value, ellipsis fallback — matches the
+     Syncfusion showcase exactly so every cell is exactly
+     one line tall and the OWNER/CLOSE row aligns
+     identically with the PROB./PRIORITY row across all
+     cards. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   min-width: 0;
 }
 .pipeline-card-meta dd .priority-chip {
-  /* Priority chip stays inline with the value, not on a new line. */
+  /* Priority chip stays inline with the value, not on a new
+     line. `align-self: flex-start` opts the chip out of
+     any flex-stretch behaviour so it always sizes to its
+     content (e.g. "Medium" ~58px, "Critical" ~58px).
+     `white-space: nowrap` keeps the chip atomic — it
+     never breaks "Medium" into "Mediu" / "m". */
   display: inline-block;
   vertical-align: middle;
+  align-self: flex-start;
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .pipeline-card-meta-wide { grid-column: 1 / -1; }
 .terminal-meta { grid-template-columns: 1fr 1fr; }
@@ -606,6 +823,18 @@ a:hover { color: var(--color-primary-hover); text-decoration: underline; }
   text-transform: capitalize;
   line-height: 1.5;
   letter-spacing: 0.02em;
+  /* The chip is an atomic pill — the label ("Medium", "Critical")
+     must always be readable in full and must never be broken
+     mid-word ("Mediu / m"). The pill is allowed to be wider than
+     its grid cell so the full label is preserved; the surrounding
+     `dd` cell will simply wrap to a new line if needed. */
+  white-space: nowrap;
+  overflow-wrap: normal;
+  word-break: keep-all;
+  min-width: fit-content;
+  max-width: none;
+  overflow: visible;
+  text-overflow: clip;
 }
 .priority-low {
   background: var(--color-success-soft);
@@ -622,6 +851,12 @@ a:hover { color: var(--color-primary-hover); text-decoration: underline; }
   color: #b91c1c;
   border: 1px solid color-mix(in oklch, var(--color-danger) 35%, transparent);
 }
+.priority-critical {
+  background: var(--color-danger-soft);
+  color: #7f1d1d;
+  border: 1px solid color-mix(in oklch, var(--color-danger) 55%, transparent);
+  font-weight: 800;
+}
 
 /* Forecast chip (showcase palette) */
 .forecast-chip {
@@ -633,11 +868,14 @@ a:hover { color: var(--color-primary-hover); text-decoration: underline; }
   text-transform: uppercase;
   letter-spacing: 0.04em;
   line-height: 1.5;
+  /* Forecast label is always visible in full ("Pipeline", "Best
+     Case", "Commit", "Omitted"). The pill sizes itself to its
+     text; we deliberately do NOT cap width or ellipsise. */
   white-space: nowrap;
   flex: 0 0 auto;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  max-width: none;
+  overflow: visible;
+  text-overflow: clip;
   background: oklch(94% 0.04 250);
   color: oklch(40% 0.15 250);
   border: 1px solid oklch(85% 0.06 250);
@@ -666,14 +904,42 @@ a:hover { color: var(--color-primary-hover); text-decoration: underline; }
   box-shadow: var(--shadow-sm);
   border: 1px solid var(--color-border);
   padding: var(--space-3);
-  overflow: hidden;        /* keep chip / title from bleeding out */
+  /* `overflow: hidden` keeps the inner content (title text, chip
+     borders) clipped to the rounded card shape. The card itself
+     is allowed to grow vertically to fit its content (no fixed
+     height, no line-clamp) so every piece of business info
+     remains fully visible. `box-sizing: border-box` pins the
+     outer height when the selected state swaps border-color. */
+  overflow: hidden;
   min-width: 0;            /* allow flex children to shrink */
+  box-sizing: border-box;
+  min-height: 0;
+  /* Belt-and-braces: explicitly pin the transition properties
+     to a paint-only list (`box-shadow`, `border-color`) rather
+     than the shorthand `transition: all`. Even if future
+     maintainers add a different visual state here, they cannot
+     accidentally introduce a layout-changing transition (no
+     `transform`, no `top/left/right/bottom`, no `width/height`,
+     no `margin/padding`) that would trigger a horizontal reflow
+     on focus/hover. */
+  transition:
+    box-shadow var(--dur) var(--ease),
+    border-color var(--dur) var(--ease);
 }
 .e-kanban.e-pipeline-kanban .e-kanban-content .e-card:hover {
-  box-shadow: var(--shadow);
+  /* Hover effect is paint-only. The selected state below
+     already provides the visual feedback via `border-color`
+     swap. Hovering should NOT change any property that
+     participates in layout (no shadow growth, no border
+     width change, no transform) — the only feedback is a
+     darker border colour. */
+  border-color: var(--color-border-strong);
+  background-color: var(--color-surface);
 }
 .e-kanban.e-pipeline-kanban .e-kanban-content .e-card-selected {
   border-color: var(--color-primary);
+  /* Outer box-shadow ring — does not affect border-box so the
+     card height stays the same when selected. */
   box-shadow: 0 0 0 2px var(--color-primary-soft);
 }
 
@@ -685,9 +951,27 @@ a:hover { color: var(--color-primary-hover); text-decoration: underline; }
   display: none !important;
 }
 
-/* Compact the column min-width so 6 columns fit in the viewport */
+/* Compact the column min-width so 6 columns fit in the viewport.
+   340px gives the meta grid enough horizontal space that every
+   realistic seed value ("Daniel Carter" ~57px at 10px font
+   weight 600, "Sep 22, 2026" ~57px, "Medium" chip ~50px)
+   renders IN FULL on a single line in BOTH the normal AND
+   the hover/selected state.
+
+   The Syncfusion kanban internally applies a `~14-16px`
+   padding to each `.e-kanban-column` for the scrollbar
+   gutter + column gap. A 340px column therefore resolves
+   to approximately:
+     340 - 26 (card padding + border) - 12 ~ 16 (column
+     chrome) - 10 (column gap) = ~290 / 2 = ~140px per cell
+   which is comfortably larger than the widest realistic
+   seed value (~65px for "Christopher Alexander"). 6
+   columns at 340px = 2040px, which will require horizontal
+   scroll in the 1440px --maxw-app viewport — the
+   `.kanban-wrap` already has `overflow-x: auto` so this
+   works smoothly. */
 .e-kanban.e-pipeline-kanban .e-kanban-content .e-kanban-column {
-  min-width: 268px;
+  min-width: 340px;
 }
 
 /* Pipeline page header icon — square indigo like the showcase */
@@ -758,16 +1042,25 @@ a:hover { color: var(--color-primary-hover); text-decoration: underline; }
   font-weight: 600;
   font-size: 13px;
   color: var(--color-text);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  /* Name always visible. Wrap onto a second line only if the
+     patient name is genuinely longer than the cell — e.g.
+     "Christopher Alexander" will wrap, but "Brian Perry" stays
+     on one line. `overflow-wrap: break-word` (NOT `anywhere`)
+     only permits the engine to break a word when the word
+     itself would overflow the cell, so common two-word names
+     never break mid-word. */
+  white-space: normal;
+  overflow-wrap: break-word;
   min-width: 0;
 }
 .wl-card-line {
   font-size: 11px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  /* Lines like "Therapy Session • Priority 91" / "Melissa Tucker"
+     — stay on one line as long as the longest token fits. Wrap
+     to a second line if not. */
+  white-space: normal;
+  overflow-wrap: break-word;
+  min-width: 0;
 }
 .wl-card-meta {
   display: flex;
@@ -779,13 +1072,16 @@ a:hover { color: var(--color-primary-hover); text-decoration: underline; }
 .wl-card-waiting {
   font-size: 11px;
   color: var(--color-text-muted);
+  white-space: nowrap;
 }
 .wl-card-dates {
   font-size: 11px;
   margin-top: 4px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  /* Date range strings are always full visibility — never
+     truncate, only wrap if too narrow. */
+  white-space: normal;
+  overflow-wrap: break-word;
+  min-width: 0;
 }
 
 /* Waitlist card surface — match the showcase look */
@@ -800,15 +1096,40 @@ a:hover { color: var(--color-primary-hover); text-decoration: underline; }
   background: var(--color-surface);
   box-shadow: var(--shadow-sm);
   border: 1px solid var(--color-border);
+  /* `border-box` plus an explicit `min-height: 0` prevents the
+     selected state (which swaps box-shadow and border-color
+     below) from changing the card's outer height. Without
+     `box-sizing: border-box` a `border-color` swap alone is
+     safe, but a future theme that bumps `border-width` on
+     selection would otherwise add 2-4px to the visible card
+     and cause the selected card to jump taller than its
+     siblings. */
+  box-sizing: border-box;
   padding: var(--space-3);
   overflow: hidden;
   min-width: 0;
+  min-height: 0;
+  /* Belt-and-braces: same paint-only transition as the
+     pipeline card. Future maintainers cannot accidentally
+     introduce a layout-changing transition here. */
+  transition:
+    box-shadow var(--dur) var(--ease),
+    border-color var(--dur) var(--ease);
 }
 .e-kanban.e-waitlist-kanban .e-kanban-content .e-card:hover {
-  box-shadow: var(--shadow);
+  /* Hover effect is paint-only.  */
+  border-color: var(--color-border-strong);
+  background-color: var(--color-surface);
 }
+
 .e-kanban.e-waitlist-kanban .e-kanban-content .e-card-selected {
   border-color: var(--color-primary);
+  /* Outer ring only — `box-shadow: 0 0 0 2px ...` does NOT
+     affect border-box so the card's height stays identical
+     between the selected and unselected states. Without this
+     rule, any future change to the selected state's border
+     would create a 1-2px vertical jump relative to the
+     neighbouring unselected cards. */
   box-shadow: 0 0 0 2px var(--color-primary-soft);
 }
 
@@ -830,3 +1151,7 @@ a:hover { color: var(--color-primary-hover); text-decoration: underline; }
 .e-kanban.e-waitlist-kanban .e-kanban-content .e-swimlane-content {
   padding: 4px;
 }
+.e-kanban .e-kanban-content .e-content-row .e-content-cells .e-card-wrapper .e-card.e-selection:hover, .e-kanban .e-kanban-content .e-content-row .e-content-cells .e-card-container .e-card.e-selection:hover {
+  padding: var(--space-3) !important;
+}
+ 

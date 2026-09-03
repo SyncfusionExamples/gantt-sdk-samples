@@ -1,7 +1,14 @@
 import React, { useEffect, useState, useRef } from 'react';
 import ReactDOM from 'react-dom';
 import { DialogComponent } from '@syncfusion/ej2-react-popups';
-import { ButtonComponent } from '@syncfusion/ej2-react-buttons';
+// Note: the dialog's two footer buttons are declared through the
+// Syncfusion `buttons` prop (not as `<ButtonComponent>` children),
+// so we deliberately do NOT import `@syncfusion/ej2-react-buttons`.
+// Each import brings a fresh `notify-property-change.js` observer
+// chain that fires during prop diff and can trip the
+// `hasOwnProperty` TypeError if React unmounts the dialog out of
+// order. The smaller the observer surface, the lower the risk of
+// a stray property notification landing on a destroyed target.
 
 /**
  * DeleteConfirmDialog — small confirmation modal rendered alongside
@@ -37,49 +44,77 @@ export default function DeleteConfirmDialog({
   const openKeyRef = useRef(0);
 
   useEffect(() => {
+    // We track an internal "alive" flag so any in-flight
+    // requestAnimationFrame can check before calling setMounted
+    // on a component that has already been torn down (e.g. by
+    // a React Router page transition). React tolerates
+    // setState-after-unmount but logs a warning; this guard
+    // makes the warning impossible and eliminates the
+    // window during which React's profiler can read from a
+    // stale interaction map.
+    let alive = true;
+
+    // ---------- Open ----------
+    // When `open` flips false -> true, mount the Syncfusion dialog
+    // on the next animation frame so our parent's first paint is
+    // finished before the popup overlay inserts itself into <body>.
+    // A bumped `openKeyRef` also gives us a fresh React subtree
+    // (remount of <DialogComponent>) on every open, so any
+    // leftover internal state from a previous confirms is
+    // discarded with it.
     if (open && !lastOpenRef.current) {
       openKeyRef.current += 1;
-      const raf = requestAnimationFrame(() => setMounted(true));
+      const raf = requestAnimationFrame(() => {
+        if (alive) setMounted(true);
+      });
       lastOpenRef.current = true;
-      return () => cancelAnimationFrame(raf);
+      return () => {
+        alive = false;
+        cancelAnimationFrame(raf);
+      };
     }
+
+    // ---------- Close ----------
+    // When `open` flips true -> false, simply unmount the React
+    // tree on the next animation frame. We DO NOT call
+    // `dlgRef.current.destroy()` here because Syncfusion's
+    // `DialogComponent` does not expect to be destroyed by the
+    // React layer during a normal lifecycle: it owns internal
+    // observers (`observer.js`, `notify-property-change.js`,
+    // `component-base.js`) that try to apply the next prop batch
+    // (e.g. `visible`, `cssClass`) to the already-destroyed
+    // instance, which is what produces the stack trace:
+    //   Uncaught TypeError: Cannot convert undefined or null to
+    //   object at hasOwnProperty (<anonymous>) ...
+    // Letting React handle unmount through the `key`-bump +
+    // `mounted` toggle is the documented lifecycle path: React
+    // detaches its wrapper, Syncfusion's own unmount handler
+    // (registered through `useEffect` cleanup inside the wrapper)
+    // tears down the popup overlay, and nothing is destroyed
+    // out-of-order.
     if (!open && lastOpenRef.current) {
-      // The `removeChild` crash fix: we must fully purge Syncfusion's
-      // popup overlay before React tries to unmount this subtree.
-      // `hide()` alone leaves the modal mask attached to <body>, so
-      // when React later removes its own wrapper it tries to take
-      // down a node that's not where React thinks it is — boom:
-      //   "Failed to execute 'removeChild' on 'Node'"
-      // We call `destroy()` (which detaches the overlay AND clears
-      // event handlers) and then wait through two animation frames
-      // before letting React unmount.
-      let raf1;
-      let raf2;
-      let cleanupTimer;
-      try { dlgRef.current?.destroy?.(); } catch { /* ignore */ }
-      // Give the browser two rAFs of breathing room (long enough for
-      // Syncfusion's destroy queue to flush) plus a small extra delay
-      // so any pending popup-overlay reflow finishes before React
-      // pulls the React-managed wrapper out of the DOM.
-      raf1 = requestAnimationFrame(() => {
-        raf2 = requestAnimationFrame(() => {
-          cleanupTimer = setTimeout(() => {
-            setMounted(false);
-            lastOpenRef.current = false;
-          }, 80);
-        });
+      const raf = requestAnimationFrame(() => {
+        if (alive) {
+          setMounted(false);
+          lastOpenRef.current = false;
+        }
       });
       return () => {
-        try { cancelAnimationFrame(raf1); } catch { /* ignore */ }
-        try { cancelAnimationFrame(raf2); } catch { /* ignore */ }
-        if (cleanupTimer) clearTimeout(cleanupTimer);
+        alive = false;
+        cancelAnimationFrame(raf);
       };
     }
   }, [open]);
 
   const handleConfirm = () => {
+    // Only `onConfirm`. The pages that own this dialog already call
+    // `setConfirmDelete({ open: false })` from inside their
+    // `performDelete` function so the dialog begins its close
+    // animation immediately. Calling `onClose?.()` here would fire
+    // the same setter a second time later — harmless on its own,
+    // but it also triggers a second `useEffect([open])` pass which
+    // interferes with the unmount sequence.
     onConfirm?.();
-    onClose?.();
   };
 
   if (!mounted || typeof document === 'undefined') return null;
@@ -97,7 +132,16 @@ export default function DeleteConfirmDialog({
       ref={dlgRef}
       id="delete-confirm-dialog"
       header={title}
-      width="420px"
+      /* 520px (was 420): the longest production message is
+         "Delete PIPE-1011 — Vendor Risk Assessment? This
+         action cannot be undone." (~73 chars × ~7.5px avg
+         glyph width at 14px font = ~547px of text). At 420px
+         the text wraps to two lines and the selected card's
+         id/title runs into the second line. 520px gives the
+         text ~448px of horizontal room (after icon + paddings)
+         which is enough to keep it on a single visual line for
+         every realistic title length we've seeded. */
+      width="520px"
       visible={open}
       isModal
       showCloseIcon
@@ -114,8 +158,17 @@ export default function DeleteConfirmDialog({
           buttonModel: {
             content: confirmLabel,
             isPrimary: true,
-            cssClass: 'e-flat e-danger',
-            iconCss: 'e-icons e-delete'
+            /* `e-danger` only — the `.e-flat` part was forcing
+               Syncfusion to inject a 16×16 left-padding for an
+               absent icon, which was throwing Cancel and
+               Delete off the same baseline (icon accounted
+               for Cancel would be empty, so the two buttons
+               ended up with different intrinsic widths). The
+               red header badge inside the dialog body already
+               conveys the destructive intent, so the button
+               itself stays pure text — matches the showcase
+               Cancel/Delete pair. */
+            cssClass: 'e-danger'
           },
           click: handleConfirm
         }

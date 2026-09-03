@@ -75,9 +75,11 @@ export default function HealthcareWaitlistPage() {
   // delegated DOM click handler so it doesn't capture a stale copy.
   const entriesRef = useRef(entries);
   useEffect(() => { entriesRef.current = entries; }, [entries]);
-  // Flag we set during a programmatic delete so SPA-handlers can
-  // ignore intermediate `dataBound` chatter from Syncfusion.
-  const isDeletingRef = useRef(false);
+  // Note: there used to be an `isDeletingRef` guard here that briefly
+  // blocked `dataBound` events during a programmatic delete. With
+  // the simplified delete flow (pure `setEntries` only) the guard is
+  // no longer needed — the event handlers below already operate on
+  // the React state, which is the single source of truth.
 
   // ------------------------------------------------------------------
   // 1. Filtering
@@ -85,11 +87,25 @@ export default function HealthcareWaitlistPage() {
   const filtered = useMemo(() => {
     const q = (filters.search || '').trim().toLowerCase();
     const { assignee, project, range } = filters;
+    // Normalise both sides of the date comparison to a local day
+    // number (yyyy-mm-dd in local TZ). `requestDateTime` is a full
+    // ISO datetime ("...T10:23:45.000Z") and the picker returns
+    // local-midnight `Date` objects — comparing raw millisecond
+    // timestamps across that mismatch gives off-by-a-few-hours
+    // false negatives at the upper boundary in any non-UTC
+    // timezone. The day-number comparison is inclusive of the
+    // end day and timezone-safe.
     const inRange = (iso) => {
       if (!range || !range.startDate || !range.endDate) return true;
       if (!iso) return false;
-      const t = new Date(iso).getTime();
-      return t >= new Date(range.startDate).getTime() && t <= new Date(range.endDate).getTime();
+      const d = new Date(iso);
+      if (isNaN(d.getTime())) return false;
+      const t = d.getFullYear() * 10000 + d.getMonth() * 100 + d.getDate();
+      const s = range.startDate;
+      const e = range.endDate;
+      const lo = s.getFullYear() * 10000 + s.getMonth() * 100 + s.getDate();
+      const hi = e.getFullYear() * 10000 + e.getMonth() * 100 + e.getDate();
+      return t >= lo && t <= hi;
     };
     return entries.filter((e) => {
       if (q) {
@@ -251,47 +267,48 @@ export default function HealthcareWaitlistPage() {
 
   const cancelDelete = () => setConfirmDelete({ open: false, entry: null });
 
+  /**
+   * Delete entry — pure React state.
+   *
+   * The kanban reads its data from `dataSource={filtered}` which is
+   * derived from `entries`. Updating `entries` through `setEntries`
+   * is therefore enough to make the card vanish: React re-renders,
+   * the filtered memo re-computes, the kanban's `dataSource` prop
+   * changes, and Syncfusion's internal diff removes the now-missing
+   * card from its DOM.
+   *
+   * Previous versions of this function called Syncfusion's
+   * imperative APIs (`k.deleteCard`, `k.dataSource = ...`,
+   * `k.refresh('cards')`) in addition to `setEntries` — that was
+   * a workaround for the recurring
+   * `Failed to execute 'removeChild' on 'Node'` crash, whose actual
+   * root cause was an out-of-order Dialog teardown. With the dialog
+   * fixed, those imperative calls are redundant: they fire a
+   * separate Syncfusion render pass that races React's reconciliation
+   * and is exactly what was producing the
+   *   Uncaught TypeError: Cannot convert undefined or null to object
+   *     at hasOwnProperty (<anonymous>)
+   * stack trace through observer.js / notify-property-change.js /
+   * component-base.js. Dropping them is not just a code-size win —
+   * it eliminates the second observer pass entirely.
+   */
   const performDelete = () => {
     const target = confirmDelete.entry;
     if (!target) return;
 
-    // Close the dialog FIRST (synchronously) so DeleteConfirmDialog
-    // starts its delayed unmount sequence.
+    // Close the confirmation dialog first. DeleteConfirmDialog's
+    // close branch now does a single rAF + unmount, so the popup
+    // teardown runs in lockstep with React's next commit and never
+    // leaves Syncfusion's observer chain holding a destroyed
+    // reference.
     setConfirmDelete({ open: false, entry: null });
 
-    isDeletingRef.current = true;
-    requestAnimationFrame(() => {
-      const nextEntries = entriesRef.current.filter((p) => p.waitlistId !== target.waitlistId);
-      entriesRef.current = nextEntries;
+    setEntries((prev) => prev.filter((e) => e.waitlistId !== target.waitlistId));
 
-      const k = kanbanRef.current;
-      if (k) {
-        try {
-          if (typeof k.deleteCard === 'function') {
-            k.deleteCard(target);
-          }
-        } catch { /* fall through */ }
-        try { k.dataSource = nextEntries; } catch { /* ignore */ }
-        try { k.refresh?.('cards'); } catch { /* ignore */ }
-      }
-
-      window.__toast?.({
-        title: 'Entry deleted',
-        content: `${target.waitlistId} · ${target.patientName}`,
-        cssClass: 'e-toast-warning'
-      });
-
-      // Step 4 — after Syncfusion has fully settled, mirror the
-      // updated array into React state via a microtask + timeout.
-      // We use `queueMicrotask` and then `setTimeout` to give
-      // Syncfusion multiple flushes to detach its cloned card DOM
-      // before React's reconciler even wakes up.
-      queueMicrotask(() => {
-        setTimeout(() => {
-          setEntries(nextEntries);
-          isDeletingRef.current = false;
-        }, 120);
-      });
+    window.__toast?.({
+      title: 'Entry deleted',
+      content: `${target.waitlistId} · ${target.patientName}`,
+      cssClass: 'e-toast-warning'
     });
   };
 
@@ -452,7 +469,6 @@ export default function HealthcareWaitlistPage() {
               showItemCount: true
             }}
             allowDragAndDrop
-            allowSelection
             allowKeyboard
             cardClick={(e) => handleCardClick(e.data, e)}
             cardDoubleClick={(e) => handleCardDoubleClick(e.data, e)}
