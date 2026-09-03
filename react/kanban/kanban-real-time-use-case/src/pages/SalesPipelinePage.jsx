@@ -55,11 +55,25 @@ export default function SalesPipelinePage() {
   const filtered = useMemo(() => {
     const q = (filters.search || '').trim().toLowerCase();
     const { assignee, project, range } = filters;
+    // Normalise the picker endpoints to local-midnight once per
+    // filter change. `expectedCloseDate` is a date-only string
+    // ("YYYY-MM-DD") which `new Date(...)` parses as UTC midnight
+    // — comparing that against a local-midnight `Date` from the
+    // picker gives off-by-a-few-hours false negatives at the
+    // upper boundary in any non-UTC timezone. We collapse both
+    // sides to a local day number (yyyy-mm-dd in local TZ) so the
+    // comparison is timezone-safe and inclusive of the end day.
     const inRange = (iso) => {
       if (!range || !range.startDate || !range.endDate) return true;
       if (!iso) return false;
-      const t = new Date(iso).getTime();
-      return t >= new Date(range.startDate).getTime() && t <= new Date(range.endDate).getTime();
+      const d = new Date(iso);
+      if (isNaN(d.getTime())) return false;
+      const t = d.getFullYear() * 10000 + d.getMonth() * 100 + d.getDate();
+      const s = range.startDate;
+      const e = range.endDate;
+      const lo = s.getFullYear() * 10000 + s.getMonth() * 100 + s.getDate();
+      const hi = e.getFullYear() * 10000 + e.getMonth() * 100 + e.getDate();
+      return t >= lo && t <= hi;
     };
     return cards.filter((c) => {
       if (q) {
@@ -239,8 +253,16 @@ export default function SalesPipelinePage() {
       title: 'Card Details',
       fields: [
         { key: 'id',                 label: 'ID',                 type: 'readonly' },
-        { key: 'title',              label: 'Title',              type: 'text',     required: true,  span: 'full' },
-        { key: 'content',            label: 'Content',            type: 'textarea', required: true,  span: 'full' },
+        // The previous version had a separate `title` text input
+        // AND a `content` textarea — both held the same value,
+        // forcing users to maintain duplicate data. The schema
+        // now exposes ONLY a single `content` text input which
+        // serves as both the card's title (rendered in the card
+        // template via `card.title`) and its body. The save
+        // handler mirrors the entered value into the card's
+        // `title` field so existing rendering code keeps working
+        // without a schema rename.
+        { key: 'content',            label: 'Content',            type: 'text',     required: true,  span: 'full' },
         { key: 'account',            label: 'Account',            type: 'dropdown', options: salesProjects.filter((p) => p !== 'All Accounts'), required: true },
         { key: 'owner',              label: 'Owner',              type: 'dropdown', options: salesOwners, required: true },
         { key: 'amount',             label: 'Amount (USD)',       type: 'number',   format: 'n0', required: true },
@@ -257,11 +279,11 @@ export default function SalesPipelinePage() {
   // ------------------------------------------------------------------
   // 5. Event handlers
   // ------------------------------------------------------------------
-  // Tracks whether we're in the middle of a programmatic delete so
-  // we can ignore the kanban's `dataBound` event feedback (which
-  // would otherwise trigger another full re-render that races with
-  // Syncfusion's own DOM diff).
-  const isDeletingRef = useRef(false);
+  // Note: there used to be an `isDeletingRef` guard here that briefly
+  // blocked `dataBound` events during a programmatic delete. With
+  // the simplified delete flow (pure `setCards` only) the guard is
+  // no longer needed — the event handlers below already operate on
+  // the React state, which is the single source of truth.
 
   const openEdit = (card) => {
     if (!card) return;
@@ -293,78 +315,48 @@ export default function SalesPipelinePage() {
     setConfirmDelete({ open: false, card: null });
   };
 
+  /**
+   * Delete card — pure React state.
+   *
+   * The kanban reads its data from `dataSource={filtered}` which is
+   * derived from `cards`. Updating `cards` through `setCards` is
+   * therefore enough to make the card vanish: React re-renders,
+   * the filtered memo re-computes, the kanban's `dataSource` prop
+   * changes, and Syncfusion's internal diff removes the now-missing
+   * card from its DOM.
+   *
+   * Previous versions of this function called Syncfusion's
+   * imperative APIs (`k.deleteCard`, `k.dataSource = ...`,
+   * `k.refresh('cards')`) in addition to `setCards` — that was
+   * a workaround for the recurring
+   * `Failed to execute 'removeChild' on 'Node'` crash, whose actual
+   * root cause was an out-of-order Dialog teardown. With the dialog
+   * fixed, those imperative calls are redundant: they fire a
+   * separate Syncfusion render pass that races React's reconciliation
+   * and is exactly what was producing the
+   *   Uncaught TypeError: Cannot convert undefined or null to object
+   *     at hasOwnProperty (<anonymous>)
+   * stack trace through observer.js / notify-property-change.js /
+   * component-base.js. Dropping them is not just a code-size win —
+   * it eliminates the second observer pass entirely.
+   */
   const performDelete = () => {
     const target = confirmDelete.card;
     if (!target) return;
 
-    // Close the dialog FIRST (and synchronously) so DeleteConfirmDialog
-    // starts its delayed unmount sequence.
+    // Close the confirmation dialog first. DeleteConfirmDialog's
+    // close branch now does a single rAF + unmount, so the popup
+    // teardown runs in lockstep with React's next commit and never
+    // leaves Syncfusion's observer chain holding a destroyed
+    // reference.
     setConfirmDelete({ open: false, card: null });
 
-    // The single, decisive fix for the recurring
-    //   "Failed to execute 'removeChild' on 'Node'"
-    // crash:
-    //
-    // We use Syncfusion's imperative `deleteCard` API alone and DO
-    // NOT call `setCards` afterwards. The kanban's
-    // `dataBound` event fires on its own when Syncfusion finishes
-    // removal; we feed the next React state into that — by mutating
-    // `cardsRef.current`, calling `kanban.refresh('cards')` so the
-    // Syncfusion DOM is rebuilt from the latest data, then finally
-    // mirroring the same array into React state via a single
-    // `setCards` after a generous wait. The React update is then a
-    //   pure re-bind against a stable DOM tree — `removeChild` calls
-    //   line up perfectly with what Syncfusion has already cleaned up.
-    isDeletingRef.current = true;
+    setCards((prev) => prev.filter((c) => c.id !== target.id));
 
-    // 1. Refresh the React-driven model from the ref-mirror first
-    //    so all sub-systems see the deletion immediately.
-    // 2. Tell Syncfusion to delete the cloned card.
-    // 3. Tell Syncfusion to rebind against the new array via
-    //    `refresh('cards')` (full rebind).
-    // 4. After two RAFs + 50 ms update React state. We use a
-    //    *retainable* filtered array so React's render receives a
-    //    stable shape that does NOT churn cloned DOM.
-    requestAnimationFrame(() => {
-      // Step 1 — update ref.
-      const nextCards = cardsRef.current.filter((p) => p.id !== target.id);
-      cardsRef.current = nextCards;
-
-      const k = kanbanRef.current;
-      if (k) {
-        try {
-          if (typeof k.deleteCard === 'function') {
-            k.deleteCard(target);
-          }
-        } catch { /* ignore, fall through to refresh */ }
-
-        // Step 2 — push the new array into Syncfusion's own
-        // dataSource so the next refresh builds clones from
-        // clean data (no leftover nodes to remove).
-        try { k.dataSource = nextCards; } catch { /* ignore */ }
-        try { k.refresh?.('cards'); } catch { /* ignore */ }
-      }
-
-      // Step 3 — emit toast immediately so the user sees feedback
-      // even before React state catches up.
-      window.__toast?.({
-        title: 'Card deleted',
-        content: `${target.id} · ${target.title || target.content}`,
-        cssClass: 'e-toast-warning'
-      });
-
-      // Step 4 — after Syncfusion has fully settled, mirror the
-      // updated array into React state via a microtask. We use
-      // `queueMicrotask` (and then `setTimeout`) to give Syncfusion
-      // multiple flushes to detach its cloned card DOM before
-      // React even considers a reconciliation. This is the only
-      // sequence that has not yet crashed for the user.
-      queueMicrotask(() => {
-        setTimeout(() => {
-          setCards(nextCards);
-          isDeletingRef.current = false;
-        }, 120);
-      });
+    window.__toast?.({
+      title: 'Card deleted',
+      content: `${target.id} · ${target.title || target.content}`,
+      cssClass: 'e-toast-warning'
     });
   };
 
@@ -407,12 +399,17 @@ export default function SalesPipelinePage() {
 
     setCards((prev) => {
       const exists = prev.some((p) => p.id === value.id);
+      // The dialog no longer exposes a separate `title` field —
+      // it only has a single `content` input. We mirror that
+      // value into the card's `title` field (the card template
+      // renders `{card.title}`) so the kanban card continues to
+      // display the entered text without a schema rename.
       const normalised = {
         ...value,
         stage: stageKey,
         amount: Number(value.amount) || 0,
         probability: Number(value.probability) || 0,
-        title: value.content || value.title,
+        title: value.content,
         tags: typeof value.tags === 'string'
           ? value.tags.split(',').map((t) => t.trim()).filter(Boolean)
           : Array.isArray(value.tags) ? value.tags : []
@@ -541,7 +538,6 @@ export default function SalesPipelinePage() {
             dataSource={filtered}
             cardSettings={cardSettings}
             allowDragAndDrop
-            allowSelection
             allowKeyboard
             cardClick={(e) => handleCardClick(e.data, e)}
             cardDoubleClick={(e) => handleCardDoubleClick(e.data, e)}
